@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Xunit.Runner.Common;
 using Xunit.Sdk;
 using Xunit.v3;
 
@@ -20,15 +19,16 @@ public class AcceptanceTestV3
 		{
 			try
 			{
-				var diagnosticMessageSink = new _NullMessageSink();
+				var diagnosticMessageSink = _NullMessageSink.Instance;
 				await using var testFramework = new XunitTestFramework(diagnosticMessageSink, configFileName: null);
 
 				using var discoverySink = SpyMessageSink<_DiscoveryComplete>.Create();
 				var assemblyInfo = Reflector.Wrap(Assembly.GetEntryAssembly()!);
 				var discoverer = testFramework.GetDiscoverer(assemblyInfo);
+				var discoveryOptions = _TestFrameworkOptions.ForDiscovery();
 				foreach (var type in types)
 				{
-					discoverer.Find(type.FullName!, discoverySink, _TestFrameworkOptions.ForDiscovery());
+					discoverer.Find(type.FullName!, discoverySink, discoveryOptions);
 					discoverySink.Finished.WaitOne();
 					discoverySink.Finished.Reset();
 				}
@@ -37,7 +37,8 @@ public class AcceptanceTestV3
 
 				using var runSink = SpyMessageSink<_TestAssemblyFinished>.Create();
 				var executor = testFramework.GetExecutor(assemblyInfo);
-				executor.RunTests(testCases, runSink, _TestFrameworkOptions.ForExecution());
+				var executionOptions = _TestFrameworkOptions.ForExecution();
+				executor.RunTests(testCases, runSink, executionOptions);
 				runSink.Finished.WaitOne();
 
 				tcs.TrySetResult(runSink.Messages.ToList());
